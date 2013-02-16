@@ -1,0 +1,57 @@
+Chris Patton 
+21 Sep 2012
+
+This gnuradio module illustrates that it is possible to have blocks with 
+variable output rate. In addition, we show how to write a block to output
+chunks of data in place of a stream. Lastly, the code domonstrates how to use
+PMTs to associate metadatia with the stream. This gives us a way to utilize the 
+gnuradio architecture for the backend signal processing for QRAAT. 
+
+20 Sep 2012 [PROBLEM SOLVED]
+(1) foo_peak_fv simulates a peak detector: If n or more continigous data are
+ greater than specified thershold, then the block outputs a vector containing
+ the preceding m before the end of the peak. foo_wait_vv waits for this 
+ vector and output its meta data. Both blocks calculate the average value of 
+ the vector, and this value is then compared in foo_wait_vv. 
+
+ I've observed that these averages differ 15% of the time. I would like to
+ get to the bottom of this error. Perhaps it's related to the assumptions I've 
+ made about gr buffers. In particular:
+
+(2) Say we call set_history( m ) in a general block's constructor. Then 
+ ninput_items[0] in the work function refers to the number of datum in the 
+ buffer, including the last m. I assume that noutput_items refers to the 
+ number of NEW items needing processing. Based on this assumption, does 
+ &in[0] refer to the START of the NEW items? Then &in[noutput_items-1] would 
+ refer to the end of the buffer and &in[-m] would give the beginning of the 
+ history. (Question posted to stackoverflow 20/9/12.) 
+[RIGHT http://stackoverflow.com/questions/12518171/gnu-radio-history] 
+ This assumption was wrong and an explanation is provided in the link. 
+
+(3) I suspect alternatively that this error can be a result of the calculation. 
+ The random values range from the smallest floating point number to 10000.00. 
+ I sum m number of these and divide by m. I might find that the calculation will
+ be precise when I use integers instead of floats. 
+[WRONG] The precision for the calculation is the same both times, since it's 
+ performed by the same processor. Duh. 
+
+
+14 Sep 2012
+So there are some cool things I've learned here. 
+
+(1) Buffer size is arbitrary. GNU Radio sets it in order to optimize dataflow.
+ There is no way that I could count on it being a particular size. 
+
+(2) Variable output rate is possible without causing the next block to wait 
+ forever. I suspect that gr_sync_blocks (1:1) wait for input before 
+ continuing; general blocks can be programmed to not block while waiting 
+ for input. 
+
+(3) set_history(n) causes atleast the last n items to appear in the buffer. 
+ foo_wait_ff demonstrates how this is done. 
+
+(4) consume() / consume_each() are used to tell the runtime how many items 
+ we've used. With consume(), specify a channel. produce() / produce_each() 
+ do the complimentary action.
+
+
